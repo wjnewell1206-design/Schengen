@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schengen Days Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white text-black min-h-screen flex items-center justify-center p-6">
+  <div class="w-full max-w-lg bg-white border border-gray-200 p-8 rounded-xl shadow-xl">
+    <h1 class="text-3xl font-bold mb-6 text-center">Schengen Days Tracker</h1>
+
+    <form id="tripForm" class="space-y-4 mb-6">
+      <div>
+        <label for="arrival" class="block mb-1 font-medium">Arrival Date</label>
+        <input type="date" id="arrival" class="w-full p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-black">
+      </div>
+      <div>
+        <label for="departure" class="block mb-1 font-medium">Departure Date</label>
+        <input type="date" id="departure" class="w-full p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-black">
+      </div>
+      <button type="submit" class="w-full bg-black hover:bg-gray-800 text-white font-semibold py-2 px-4 rounded-lg">Add Trip</button>
+    </form>
+
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">Trips</h2>
+      <ul id="tripsList" class="space-y-2"></ul>
+    </div>
+
+    <div class="mb-6">
+      <label for="asOfDate" class="block mb-2 font-medium">Check as of date:</label>
+      <input type="date" id="asOfDate" class="w-full p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-black">
+    </div>
+
+    <div id="summary" class="text-3xl font-extrabold text-center space-y-2"></div>
+  </div>
+
+  <script>
+    let trips = JSON.parse(localStorage.getItem('trips') || '[]');
+
+    function saveTrips() {
+      localStorage.setItem('trips', JSON.stringify(trips));
+    }
+
+    function deleteTrip(index) {
+      trips.splice(index, 1);
+      saveTrips();
+      renderTrips();
+      const asOfDate = document.getElementById('asOfDate').value || new Date().toISOString().split('T')[0];
+      calculateDays(asOfDate);
+    }
+
+    function renderTrips() {
+      const list = document.getElementById('tripsList');
+      list.innerHTML = '';
+      trips.forEach((trip, index) => {
+        const days = (new Date(trip.departure) - new Date(trip.arrival)) / (1000*60*60*24) + 1;
+        const li = document.createElement('li');
+        li.className = "bg-gray-100 p-3 rounded-lg flex justify-between items-center border border-gray-200";
+        li.innerHTML = `
+          <div>
+            <span>${trip.arrival} → ${trip.departure}</span>
+            <span class='ml-2 font-bold'>(${days} days)</span>
+          </div>
+          <button onclick="deleteTrip(${index})" class="text-red-600 hover:text-red-800 font-semibold">Delete</button>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function calculateDays(asOf) {
+      const refDate = new Date(asOf);
+      const windowStart = new Date(refDate);
+      windowStart.setDate(refDate.getDate() - 179);
+
+      let usedDays = 0;
+      trips.forEach(trip => {
+        const arr = new Date(trip.arrival);
+        const dep = new Date(trip.departure);
+        if (dep >= windowStart && arr <= refDate) {
+          const start = arr < windowStart ? windowStart : arr;
+          const end = dep > refDate ? refDate : dep;
+          usedDays += (end - start)/(1000*60*60*24) + 1;
+        }
+      });
+
+      const remaining = 90 - usedDays;
+      document.getElementById('summary').innerHTML = `
+        <div class='text-red-600'>Used: ${usedDays} days</div>
+        <div class='text-green-600'>Remaining: ${remaining} days</div>`;
+    }
+
+    document.getElementById('tripForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const arrival = document.getElementById('arrival').value;
+      const departure = document.getElementById('departure').value;
+      if (arrival && departure) {
+        trips.push({ arrival, departure });
+        saveTrips();
+        renderTrips();
+        const asOfDate = document.getElementById('asOfDate').value || new Date().toISOString().split('T')[0];
+        calculateDays(asOfDate);
+      }
+    });
+
+    document.getElementById('asOfDate').addEventListener('change', e => {
+      calculateDays(e.target.value);
+    });
+
+    // Initialize
+    renderTrips();
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('asOfDate').value = today;
+    calculateDays(today);
+  </script>
+</body>
+</html>
